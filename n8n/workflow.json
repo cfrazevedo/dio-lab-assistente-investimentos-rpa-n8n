@@ -1,0 +1,310 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "clientes",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "84976bed-67b7-4c48-abce-466bcd3d06d6",
+      "name": "Gatilho Colab extrair_clientes",
+      "webhookId": "9b7397f4-7cb2-42bc-abe2-25b7a0127de6"
+    },
+    {
+      "parameters": {
+        "url": "https://digitalinnovationone.github.io/dio-lab-assistente-investimentos-rpa-n8n/data.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "id": "128f827f-ee7a-471d-9f73-424c542dfdd4",
+      "name": "Extrair CSV Tipos Investimentos"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega o CSV como texto vindo do HTTP Request\n\nconst csvRaw = $json.data ?? $json.body ?? $json;\nconst text = typeof csvRaw === \"string\"\n  ? csvRaw\n  : JSON.stringify(csvRaw);\n\nconst lines = text\n  .split(/\\r?\\n/)\n  .map(l => l.trim())\n  .filter(Boolean);\n\nconst headers = lines[0].split(\",\").map(h => h.trim());\n\nconst investimentos = lines.slice(1).map(line => {\n  const cols = line.split(\",\").map(c => c.trim());\n  const obj = {};\n\n  headers.forEach((h, i) => {\n    obj[h] = cols[i] ?? \"\";\n  });\n\n  // Normaliza o campo minimo para número\n  obj.minimo =\n    Number(String(obj.minimo).replace(/[^\\d]/g, \"\")) || 0;\n\n  return obj;\n});\n\nreturn [{ json: { investimentos } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "960835b2-e2f3-4f44-9679-0d4fb328cf80",
+      "name": "Código Padronização Tipos"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        672,
+        -176
+      ],
+      "id": "0a3bd2ad-b4b4-4491-93d0-03cbb972ccf1",
+      "name": "Une Tipos com Clientes"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst entrada = $input.first().json;\n\n// 1. Recupera clientes e investimentos\nconst body = entrada.body ?? entrada;\n\nconst clientes = body.clientes ?? entrada.clientes ?? [];\nconst investimentos =\n  entrada.investimentos ?? body.investimentos ?? [];\n\n// 2. Converte saldo brasileiro para número\nfunction converterSaldo(valor) {\n  if (typeof valor === \"number\") return valor;\n\n  const normalizado = String(valor ?? \"\")\n    .replace(/[^\\d,.-]/g, \"\")\n    .replace(/\\./g, \"\")\n    .replace(\",\", \".\");\n\n  const numero = Number(normalizado);\n\n  return Number.isFinite(numero) ? numero : 0;\n}\n\n// 3. Processa cada cliente\nconst resultados = clientes.map(cliente => {\n  const perfil = String(cliente.perfil ?? \"\").trim();\n  const saldoNum = converterSaldo(cliente.saldo);\n\n  // 4. Filtra investimentos do mesmo perfil\n  // cujo valor mínimo seja compatível com o saldo\n  const elegiveis = investimentos.filter(inv => {\n    return (\n      String(inv.perfil ?? \"\").trim().toLowerCase() ===\n        perfil.toLowerCase() &&\n      Number(inv.minimo) <= saldoNum\n    );\n  });\n\n  // 5. Seleciona o investimento com o maior mínimo elegível\n  elegiveis.sort((a, b) =>\n    Number(b.minimo) - Number(a.minimo)\n  );\n\n  const investimento = elegiveis[0] ?? null;\n\n  // 6. Define o motivo\n  const motivo = investimento\n    ? \"saldo_ok\"\n    : \"saldo_incompatível\";\n\n  // 7. Prepara os dados da recomendação\n  const nome = String(cliente.nome ?? \"\").trim() || \"cliente\";\n\n  const minimoFormatado = investimento\n    ? Number(investimento.minimo).toLocaleString(\"pt-BR\", {\n        style: \"currency\",\n        currency: \"BRL\"\n      })\n    : null;\n\n  const produto = investimento?.produto ?? null;\n  const rentabilidade = investimento?.rentabilidade ?? null;\n\n  // 8. Gera três mensagens\n  const mensagens = [\n    `Olá, ${nome}! Considerando seu perfil ${perfil}, ` +\n    (investimento\n      ? `identificamos o produto ${produto}, com aplicação mínima ` +\n        `de ${minimoFormatado} e rentabilidade informada de ` +\n        `${rentabilidade}. Podemos conversar sobre suas características e riscos?`\n      : `não encontramos um investimento compatível com seu saldo. ` +\n        `Podemos avaliar outras alternativas?`),\n\n    `Oi, ${nome}! Analisamos as opções para seu perfil ${perfil}. ` +\n    (investimento\n      ? `O ${produto} possui aplicação mínima de ${minimoFormatado} ` +\n        `e rentabilidade informada de ${rentabilidade}. ` +\n        `Vale avaliar os riscos e as condições antes de decidir.`\n      : `não identificamos uma opção com aplicação mínima compatível ` +\n        `com seu saldo. Podemos buscar alternativas?`),\n\n    `Sr./Sra. ${nome}, conforme o perfil ${perfil} informado, ` +\n    (investimento\n      ? `o ${produto} atende ao critério de saldo mínimo, ` +\n        `com aplicação inicial de ${minimoFormatado} e rentabilidade ` +\n        `informada de ${rentabilidade}. Recomendamos avaliar riscos, ` +\n        `liquidez e horizonte de investimento.`\n      : `não identificamos uma opção elegível pelo critério de saldo ` +\n        `mínimo. Podemos avaliar outras possibilidades.`)\n  ];\n\n  // 9. Seleciona a mensagem conforme o perfil\n  const perfilNormalizado = perfil.toLowerCase();\n\n  let indiceMensagem = 0;\n\n  if (perfilNormalizado === \"moderado\") {\n    indiceMensagem = 1;\n  } else if (perfilNormalizado === \"arrojado\") {\n    indiceMensagem = 2;\n  }\n\n  // 10. Retorna os dados do cliente\n  return {\n    nome,\n    email: cliente.email ?? \"\",\n    perfil,\n    saldo_texto: cliente.saldo ?? \"\",\n    saldo_num: saldoNum,\n\n    recomendacao: investimento\n      ? {\n          perfil: investimento.perfil,\n          produto: investimento.produto,\n          minimo: Number(investimento.minimo),\n          rentabilidade: investimento.rentabilidade\n        }\n      : null,\n\n    motivo,\n\n    mensagens: {\n      0: mensagens[0],\n      1: mensagens[1],\n      2: mensagens[2]\n    },\n\n    mensagem_escolhida: mensagens[indiceMensagem]\n  };\n});\n\n// 11. Monta a saída final\nconst ok =\n  clientes.length > 0 &&\n  resultados.length === clientes.length &&\n  resultados.every(r => r.motivo === \"saldo_ok\");\n\nreturn [\n  {\n    json: {\n      ok,\n      total_clientes: clientes.length,\n      total_investimentos: investimentos.length,\n      resultados\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ],
+      "id": "9a299fe1-7c1d-494e-92cf-032e8eaafa75",
+      "name": "Unindo os resultados"
+    },
+    {
+      "parameters": {
+        "jsCode": "const resultados = $json.resultados || [];\n\nfunction parseBRL(valor) {\n  if (!valor) return 0;\n  const s = String(valor)\n    .replace(\"R$\", \"\")\n    .replace(/\\./g, \"\")\n    .replace(\",\", \".\")\n    .replace(/[^\\d.]/g, \"\")\n    .trim();\n  const n = Number(s)\n  return Number.isFinite(n) ? n : 0;\n}\n\n// retorna UM ITEM por cliente\nconst out = resultados.map(c => {\n  const saldoNum = c.saldo_num ?? parseBRL(c.saldo_texto ?? c.saldo);\n\n  return {\n    json: {\n      email_to: String(c.email || \"\").trim(),\n      nome: String(c.nome || \"\").trim(),\n      perfil: c.perfil,\n      saldo_texto: c.saldo_texto ?? c.saldo,\n      saldo_num: saldoNum,\n      recomendacao: c.recomendacao,\n      motivo: c.motivo,\n      mensagem_base: c.mensagem_escolhida || c.mensagem || \"\",\n      copy_ruyles: {\n        idioma: \"pt-BR\",\n        tom: \"amigável e profissional\",\n        tamanho: \"curto (4-6 linhas)\",\n        evitar: [\"promessas de ganho\", \"garantias\", \"linguagem agressiva\"]\n      }\n    }\n  }\n})\n\nreturn out\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "ac329a14-ff9e-4b21-9a05-aec177844404",
+      "name": "Normalizando os dados de resultados"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "openai/gpt-oss-120b",
+          "mode": "list",
+          "cachedResultName": "OPENAI/GPT-OSS-120B"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=Você é um assistente responsável por redigir e-mails personalizados sobre recomendações de investimento.\n\nSua tarefa é gerar um único e-mail para o cliente cujos dados foram recebidos nesta execução do fluxo.\n\nUtilize exclusivamente os dados dinâmicos fornecidos abaixo. Não utilize os dados do exemplo como se fossem os dados reais do cliente.\n\nDados do cliente:\n\nNome: {{ $json.nome }}\n\nE-mail: {{ $json.email_to }}\n\nPerfil de investidor: {{ $json.perfil }}\n\nSaldo disponível: {{ $json.saldo_texto }}\n\nRecomendação de investimento:\n\nProduto: {{ $json.recomendacao.produto }}\n\nInvestimento mínimo: {{ $json.recomendacao.minimo }}\n\nRentabilidade informada: {{ $json.recomendacao.rentabilidade }}\n\nMotivo da recomendação: {{ $json.motivo }}\n\nInstruções:\n\nRedija uma mensagem curta em português brasileiro (pt-BR), personalizada para o cliente atual.\n\nUtilize o nome do cliente, seu perfil e os dados da recomendação recebida.\n\nUse a rentabilidade apenas como informação fornecida, sem prometer ganhos ou oferecer garantias.\n\nNão invente dados, recomendações ou informações financeiras.\n\nO endereço de e-mail retornado deve ser exatamente o recebido nos dados do cliente.\n\nGere somente um e-mail por execução.\n\nNão use os dados da Ana Silva ou de qualquer outro exemplo como dados fixos.\n\nRetorne apenas um objeto JSON válido, sem Markdown, comentários ou texto adicional, com esta estrutura:\n\n{\n\"email\": \"endereço de e-mail do cliente atual\",\n\"subject\": \"assunto personalizado\",\n\"text_body\": \"versão em texto simples do e-mail\",\n\"html_body\": \"<p>versão HTML do e-mail</p>\"\n}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "store": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        1344,
+        0
+      ],
+      "id": "229bcc97-fa55-43ce-a4fc-897c418af540",
+      "name": "Criando uma mensagem personalizada com GPT",
+      "credentials": {
+        "openAiApi": {
+          "id": "pgpXL47O2iQEmB3s",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\nconst resultados = [];\n\nfunction extrairTextos(dado) {\n  // A resposta já está normalizada\n  if (\n    dado.subject !== undefined ||\n    dado.text_body !== undefined ||\n    dado.html_body !== undefined\n  ) {\n    return [dado];\n  }\n\n  const output = dado.output;\n\n  if (Array.isArray(output)) {\n    return output.flatMap(extrairTextos);\n  }\n\n  if (output && typeof output === \"object\") {\n    return extrairTextos(output);\n  }\n\n  if (Array.isArray(dado.content)) {\n    return dado.content\n      .filter(c => c.type === \"output_text\" && c.text)\n      .map(c => c.text);\n  }\n\n  if (typeof dado.text === \"string\") {\n    return [dado.text];\n  }\n\n  return [];\n}\n\nfor (const item of items) {\n  const textos = extrairTextos(item.json);\n\n  for (const texto of textos) {\n    try {\n      let conteudo;\n\n      if (typeof texto === \"string\") {\n        conteudo = texto\n          .trim()\n          .replace(/^```(?:json)?\\s*/i, \"\")\n          .replace(/\\s*```$/, \"\");\n\n        conteudo = JSON.parse(conteudo);\n      } else {\n        conteudo = texto;\n      }\n\n      resultados.push({\n        json: {\n          email: conteudo.email ?? \"\",\n          subject: conteudo.subject ?? \"\",\n          text_body: conteudo.text_body ?? \"\",\n          html_body: conteudo.html_body ?? \"\"\n        }\n      });\n\n    } catch (erro) {\n      resultados.push({\n        json: {\n          erro: \"Não foi possível converter a resposta em JSON.\",\n          detalhe: erro.message,\n          texto_original: texto\n        }\n      });\n    }\n  }\n}\n\nreturn resultados;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1696,
+        0
+      ],
+      "id": "82c7404f-35f6-4b23-8588-e4dd4d034c84",
+      "name": "Normalizando os dados de text"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d078682f-6d47-43dc-8134-43ef1b167355",
+              "leftValue": "={{ $json.email }}",
+              "rightValue": "^[^@\\s]+@[^@\\s]+.[^@\\s]+$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1920,
+        0
+      ],
+      "id": "d2f1f5db-23f4-4dff-904a-d49a9bd03ad2",
+      "name": "Verificando se e-mail existe"
+    },
+    {
+      "parameters": {
+        "fromEmail": "=carlos.felippe.aggio@gmail.com",
+        "toEmail": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.html_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2144,
+        0
+      ],
+      "id": "57330327-429a-4650-89a9-9272d13f93e0",
+      "name": "enviando e-mail",
+      "webhookId": "5738d4fe-7738-490b-95ec-51b60694439e",
+      "credentials": {
+        "smtp": {
+          "id": "4NlYf1FQCWI7RVJI",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Gatilho Colab extrair_clientes": {
+      "main": [
+        [
+          {
+            "node": "Extrair CSV Tipos Investimentos",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Une Tipos com Clientes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair CSV Tipos Investimentos": {
+      "main": [
+        [
+          {
+            "node": "Código Padronização Tipos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Código Padronização Tipos": {
+      "main": [
+        [
+          {
+            "node": "Une Tipos com Clientes",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Une Tipos com Clientes": {
+      "main": [
+        [
+          {
+            "node": "Unindo os resultados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unindo os resultados": {
+      "main": [
+        [
+          {
+            "node": "Normalizando os dados de resultados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizando os dados de resultados": {
+      "main": [
+        [
+          {
+            "node": "Criando uma mensagem personalizada com GPT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criando uma mensagem personalizada com GPT": {
+      "main": [
+        [
+          {
+            "node": "Normalizando os dados de text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizando os dados de text": {
+      "main": [
+        [
+          {
+            "node": "Verificando se e-mail existe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificando se e-mail existe": {
+      "main": [
+        [
+          {
+            "node": "enviando e-mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "enviando e-mail": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f75ccd0165b9e5bf802b60f35e1c53c4da24bba6027ba2469a068aec88d8d744"
+  }
+}
