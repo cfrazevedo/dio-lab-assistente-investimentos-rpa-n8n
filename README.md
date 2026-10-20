@@ -137,12 +137,12 @@ O endereço do destinatário deve ser preservado a partir dos dados originais do
 📁 dio-lab-assistente-investimentos-rpa-n8n/
 ├── 📄 README.md
 ├── 📁 src/
-│   └── 📄 extrair_clientes.ipynb   # ✅ Notebook Python (já implementado, falta só o TODO)
+│   └── 📄 extrair_clientes.ipynb   # ✅ Notebook Python
 ├── 📁 n8n/
-│   └── 📄 workflow.json            # 🎯 Seu desafio: exportar o workflow aqui
+│   └── 📄 workflow.json            # 🎯 O arquivo JSON do desafio
 └── 📁 docs/
-    ├── 📄 index.html               # ✅ Página de clientes (já implementado)
-    └── 📄 data.csv                 # ✅ Opções de investimento (já implementado)
+    ├── 📄 index.html               # ✅ Página de clientes (herdado da origem)
+    └── 📄 data.csv                 # ✅ Opções de investimento (herdado da origem)
 ```
 
 ## Como executar
