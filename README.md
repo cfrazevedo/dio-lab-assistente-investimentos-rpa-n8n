@@ -1,23 +1,27 @@
-# Criando um Assistente de Investimentos com RPA e IA Generativa
+# Assistente de Investimentos com RPA e IA Generativa
 
-## Descrição
+## Sobre o projeto
 
-Aprenda na prática como criar um fluxo de automação inteligente combinando técnicas de RPA (Robotic Process Automation) com workflows de IA no N8N.
+Este projeto foi desenvolvido como parte do desafio **Criando um Assistente de Investimentos com RPA e IA Generativa**, com o objetivo de integrar extração de dados, automação de processos, processamento de informações e inteligência artificial para produzir comunicações personalizadas para clientes fictícios.
 
-Neste desafio, você vai construir um assistente de investimentos automatizado. O fluxo começa com a extração de dados de clientes em uma página web usando Python, passa pela orquestração de um workflow no N8N e termina com a geração de mensagens personalizadas para cada perfil de investidor.
+A solução utiliza Python para coletar os dados de uma página web, n8n para orquestrar o fluxo e um modelo de linguagem acessado por meio da API da Groq para gerar mensagens personalizadas. Ao final, as mensagens são enviadas por e-mail usando SMTP.
 
-O projeto foi pensado para ser simples e acessível, mesmo para quem está dando os primeiros passos em Python e automação. A ideia é que você entenda o conceito de RPA de forma leve e aplique tudo em um cenário realista do mercado financeiro.
+> Os dados e as recomendações deste projeto são demonstrativos e destinados a fins educacionais. As mensagens geradas não constituem aconselhamento financeiro.
 
-## Objetivo do Projeto
+## Demonstração do fluxo completo
 
-Desenvolver um pipeline de automação que:
+O vídeo abaixo demonstra o workflow de ponta a ponta, desde a extração dos dados até o processamento e o envio das mensagens:
 
-1. **Coleta dados de clientes** de uma página web simulada usando Python
-2. **Processa as informações** através de um workflow no N8N
-3. **Cruza perfis de investidor** com uma base de opções de investimento
-4. **Gera mensagens personalizadas** para cada cliente
+**[Assistir ao vídeo do workflow completo no Google Drive](https://drive.google.com/file/d/18x1R_lM91XpuIOWWDbgncz10-0U-EVlH/view?usp=sharing)**
 
-Ao final, você terá um sistema funcional que demonstra como empresas do setor financeiro podem automatizar a comunicação com clientes de forma inteligente.
+## Objetivos
+
+- Extrair os dados dos clientes de uma página web com Python e BeautifulSoup.
+- Enviar os dados coletados para um webhook do n8n.
+- Consultar e processar a base de opções de investimento disponibilizada em CSV.
+- Relacionar o perfil e o saldo de cada cliente às opções elegíveis.
+- Gerar e-mails personalizados com auxílio de um modelo de linguagem.
+- Enviar as mensagens por SMTP, utilizando os campos de destinatário, assunto e conteúdo gerados no fluxo.
 
 ## Arquitetura do Projeto
 
@@ -62,79 +66,70 @@ flowchart LR
 
 ```
 
-## Tecnologias e Ferramentas
+## Tecnologias e ferramentas
 
-O projeto utiliza ferramentas gratuitas e acessíveis, organizadas conforme cada etapa do fluxo:
+| Tecnologia | Utilização no projeto |
+|---|---|
+| **Python** | Execução do notebook de extração e envio dos dados ao webhook. |
+| **BeautifulSoup** | Leitura e extração dos dados da tabela HTML de clientes. |
+| **GitHub Pages** | Hospedagem da página simulada de clientes e do arquivo CSV de investimentos. |
+| **n8n self-hosted via Node.js** | Orquestração do workflow local, transformação dos dados e integração entre as etapas. |
+| **Cloudflare Tunnel / Quick Tunnel** | Exposição temporária do serviço local do n8n à internet para que o notebook Python pudesse acessar o webhook. |
+| **Groq API** | Acesso a um modelo de linguagem com a oferta gratuita de uso disponibilizada pela plataforma, respeitando seus limites de utilização. |
+| **SMTP** | Envio das mensagens personalizadas por meio do nó **Send Email** do n8n. |
 
-| Etapa | Ferramenta | Função |
-|-------|-----------|--------|
-| Hospedagem | GitHub Pages | Servir a página de clientes e o CSV de investimentos |
-| Extração (RPA) | Python + BeautifulSoup | Coletar dados dos clientes via web scraping |
-| Orquestração | N8N | Processar dados, cruzar perfis e gerar mensagens |
-| Geração com IA | Agente de IA no N8N | Criar mensagens personalizadas com LLM (desafio extra) |
+## Como o fluxo funciona
 
-Além dessas, você pode usar IAs generativas como **Gemini**, **Claude** ou **ChatGPT** como copilotos para auxiliar na escrita de código e tirar dúvidas ao longo do desenvolvimento.
+1. **Extração dos clientes:** o notebook Python acessa a página de clientes e extrai informações como nome, e-mail, saldo e perfil de investidor.
+2. **Exposição do webhook:** como o n8n está sendo executado localmente por meio do Node.js, o Cloudflare Tunnel cria uma URL pública que encaminha as requisições para o serviço local durante os testes.
+3. **Recebimento dos dados:** o webhook do n8n recebe os dados enviados pelo notebook Python.
+4. **Leitura da base de investimentos:** o workflow consulta o CSV publicado no GitHub Pages e transforma seu conteúdo em registros utilizáveis pelo fluxo.
+5. **Processamento e recomendação:** o código JavaScript no n8n compara o perfil do cliente e o saldo disponível com os investimentos compatíveis, considerando o valor mínimo de aplicação.
+6. **Preparação dos dados:** os resultados são organizados em itens individuais, um para cada cliente, com os dados necessários para a geração da mensagem.
+7. **Geração do e-mail com IA:** o modelo de linguagem acessado pela Groq recebe os dados de cada cliente e a recomendação correspondente. O prompt orienta a geração de um assunto, de um corpo em texto simples e de uma versão HTML, sem prometer ganhos ou garantias.
+8. **Normalização e validação:** a resposta do modelo é convertida em campos estruturados. O workflow verifica se o endereço de e-mail está presente e tem formato válido antes de prosseguir.
+9. **Envio da mensagem:** o nó **Send Email** utiliza credenciais SMTP para encaminhar a mensagem ao destinatário definido no item.
 
-## Roteiro do Desafio
+## Decisões técnicas e aprendizados
 
-### Etapa 1: Entenda o Projeto
+### 1. Cloudflare para expor o n8n local
 
-Antes de começar, explore o repositório base que já contém a estrutura inicial:
+O n8n foi executado localmente por meio do Node.js, sem uma instância hospedada publicamente. Para permitir que o notebook Python acessasse o webhook, foi utilizado o **Cloudflare Tunnel**, na modalidade Quick Tunnel durante os testes.
 
-1. **Página de Clientes (`docs/index.html`):** Uma página HTML hospedada no GitHub Pages com uma lista de clientes fictícios contendo nome, email, saldo e perfil de investidor (Conservador, Moderado ou Arrojado). Disponível online [neste link](https://digitalinnovationone.github.io/dio-lab-assistente-investimentos-rpa-n8n).
-2. **Dados de Investimentos (`docs/data.csv`):** Um arquivo CSV também hospedado no GitHub Pages com opções de investimento organizadas por perfil. Disponível online [neste link](https://digitalinnovationone.github.io/dio-lab-assistente-investimentos-rpa-n8n/data.csv).
-3. **Script de RPA (`src/extrair_clientes.ipynb`):** Um notebook Python que acessa a página de clientes e extrai os dados da tabela usando BeautifulSoup.
+Essa abordagem evita a necessidade de configurar diretamente o encaminhamento de portas do roteador. A URL do túnel é usada como endereço público de acesso ao webhook enquanto o túnel está ativo.
 
-> 🤖 **Por que o script é considerado RPA?** Ele faz exatamente o que um humano faria manualmente: abre uma página, lê os dados de uma tabela e os envia para outro sistema. A diferença é que o "robô" (código) executa isso automaticamente. Essa abordagem é útil quando não existe uma API disponível ou quando precisamos integrar sistemas legados.
+**Observações importantes:**
+- A URL de um Quick Tunnel é temporária e pode mudar quando o túnel é reiniciado.
+- Para utilizar o fluxo, o processo do n8n e o túnel precisam estar em execução.
+- A URL pública do webhook deve ser tratada como um ponto de entrada exposto à internet. Em aplicações reais, devem ser consideradas autenticação, validação de entrada e outras medidas de segurança.
+- O endpoint de teste do n8n requer que o workflow esteja aguardando uma chamada de teste; para execuções regulares, deve-se usar o webhook de produção com o workflow ativo.
 
-### Etapa 2: Configure o Ambiente
+### 2. Groq como provedor de modelo de linguagem
 
-1. Faça um **fork** do repositório base para sua conta do GitHub
-2. Crie uma conta no [N8N Cloud](https://n8n.io/) ou instale localmente
-3. Abra o notebook `src/extrair_clientes.ipynb` no [Google Colab](https://colab.research.google.com/) e execute para entender o fluxo de extração
+Em vez de depender de créditos pagos da API da OpenAI, o desenvolvimento utiliza a **Groq API**, aproveitando a faixa gratuita disponibilizada pelo provedor, sujeita a limites e condições de uso.
 
-> 💡 **Atenção:** O script já extrai os dados, mas o envio ao N8N está comentado (`TODO`). Você vai configurar a URL do Webhook após criá-lo na próxima etapa.
+O modelo recebe os dados já processados pelo workflow e produz o texto do e-mail em formato estruturado. O prompt inclui instruções para personalizar a mensagem com base no cliente atual, preservar o endereço de e-mail recebido e evitar promessas de rentabilidade.
 
-### Etapa 3: Desenvolva o Workflow no N8N
+A disponibilidade de modelos, limites gratuitos e condições da API pode mudar. Consulte a documentação oficial da Groq para verificar os limites vigentes.
 
-Este é o coração do desafio! Monte um fluxo que:
+### 3. Envio por SMTP com o nó Send Email
 
-1. Receba os dados dos clientes via Webhook (copie a URL gerada e configure no script Python)
-2. Leia o arquivo `docs/data.csv` com as opções de investimento
-3. Cruze o perfil de cada cliente com a opção adequada
-4. Gere uma mensagem de recomendação para cada cliente
+Para enviar as mensagens, foi utilizado o nó **Send Email** do n8n, em vez do nó específico do Gmail. Essa alternativa permite configurar um servidor SMTP e não exige a configuração de credenciais OAuth2 específicas do Gmail.
 
-### Etapa 4 (MVP): Mensagens Estáticas
+O nó utiliza os campos normalizados pelo workflow:
+- **To Email:** endereço do cliente;
+- **Subject:** assunto personalizado;
+- **HTML:** conteúdo HTML do e-mail.
 
-Para a versão mínima, use templates de mensagem fixos baseados no perfil:
+No caso de uma conta Gmail, a configuração SMTP normalmente utiliza `smtp.gmail.com`. Dependendo das configurações da conta, pode ser necessário usar uma senha de app com a verificação em duas etapas ativada. As credenciais devem ser armazenadas nas credenciais do n8n e nunca inseridas diretamente no código ou publicadas no repositório.
 
-- **Conservador:** Foco em renda fixa e segurança
-- **Moderado:** Mix equilibrado entre renda fixa e variável
-- **Arrojado:** Ênfase em ações e maior potencial de retorno
+### 4. Tratamento individual dos clientes
 
-### Etapa 5 (Desafio): Integração com IA Generativa
+Os resultados do processamento são convertidos em itens individuais antes da etapa de geração das mensagens. Dessa forma, o modelo pode produzir uma mensagem por cliente, em vez de reutilizar os dados de um exemplo fixo.
 
-Conecte o Agente de IA do N8N a um modelo como Gemini ou GPT para:
+O endereço do destinatário deve ser preservado a partir dos dados originais do cliente. Como a IA é usada para redigir a mensagem — e não como fonte cadastral —, é importante validar se o campo de e-mail continua preenchido antes do envio.
 
-- Analisar o contexto do cliente (saldo, perfil)
-- Gerar mensagens únicas e personalizadas
-- Criar recomendações mais inteligentes e humanizadas
-
-## Entregáveis
-
-### MVP (Mínimo Viável)
-
-- [ ] Repositório forkado com o workflow N8N implementado
-- [ ] Workflow N8N exportado (`n8n/workflow.json`) com mensagens estáticas
-- [ ] Script de RPA integrado ao Webhook do N8N
-- [ ] Print ou vídeo demonstrando o fluxo funcionando de ponta a ponta
-
-### Desafio Completo
-
-- [ ] Todos os itens do MVP
-- [ ] Integração com Agente de IA no N8N
-- [ ] Mensagens geradas dinamicamente via LLM
-- [ ] Documentação explicando as decisões técnicas
+## Estrutura do repositório
 
 ## Estrutura do Repositório
 
@@ -150,23 +145,33 @@ Conecte o Agente de IA do N8N a um modelo como Gemini ou GPT para:
     └── 📄 data.csv                 # ✅ Opções de investimento (já implementado)
 ```
 
-## Prompts Úteis para Copilotos de IA
+## Como executar
 
-| Tarefa | Sugestão de Prompt |
-|--------|-------------------|
-| Gerar dados fictícios | "Crie 10 clientes fictícios com nome, email, saldo e perfil de investidor em JSON" |
-| Entender código | "Explique o que faz a biblioteca BeautifulSoup em Python" |
-| Debugar erros | "Meu script Python está dando erro X, o que pode ser?" |
-| Montar workflow | "Como configuro um webhook no N8N para receber dados JSON?" |
+1. Instale e inicie o n8n localmente.
+2. Importe o workflow exportado para o n8n e confira as conexões e credenciais necessárias.
+3. Configure a credencial de acesso à API da Groq no nó de modelo de linguagem, utilizando o endpoint e as instruções da documentação do provedor.
+4. Configure as credenciais SMTP no nó **Send Email**.
+5. Inicie um Cloudflare Tunnel para expor temporariamente a porta local do n8n e obtenha a URL pública.
+6. Configure no notebook Python a URL do webhook correspondente ao modo de execução (teste ou produção).
+7. Execute o notebook para extrair e enviar os dados.
+8. Verifique a saída de cada etapa do workflow, confirme se cada item contém o endereço correto e teste primeiro com um destinatário controlado antes de enviar para a lista completa.
+
+> **Segurança:** não publique chaves de API, senhas SMTP, senhas de aplicativos ou URLs privadas de execução. Antes de compartilhar o arquivo exportado do workflow, revise se ele contém dados sensíveis ou referências a credenciais pessoais.
 
 ## Referências
 
-- [Documentação do N8N](https://docs.n8n.io/)
-- [BeautifulSoup: Web Scraping com Python](https://realpython.com/beautiful-soup-web-scraper-python/)
-- [GitHub Pages: Guia Rápido](https://pages.github.com/)
+- [Repositório original do desafio — DIO](https://github.com/digitalinnovationone/dio-lab-assistente-investimentos-rpa-n8n)
+- [Documentação do n8n](https://docs.n8n.io/)
+- [Documentação do nó Webhook do n8n](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/)
+- [Documentação do nó Send Email do n8n](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.emailSend/)
+- [Cloudflare Tunnel — documentação oficial](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+- [Cloudflare Quick Tunnels — documentação oficial](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/)
+- [Groq API — documentação oficial](https://console.groq.com/docs/quickstart)
+- [Groq — limites de utilização](https://console.groq.com/docs/rate-limits)
+- [SMTP — configuração de envio no n8n](https://docs.n8n.io/integrations/builtin/credentials/sendemail/)
+- [BeautifulSoup — documentação](https://www.crummy.com/software/BeautifulSoup/bs4/doc/)
+- [GitHub Pages — documentação](https://docs.github.com/pages)
 
 ---
 
-**Bons estudos e mãos à obra** 🚀
-
-Se tiver dúvidas, lembre-se: a melhor forma de aprender é experimentando. Erre, corrija e celebre cada pequena vitória no caminho.
+Desenvolvido como exercício prático de integração entre **RPA, automação de workflows e IA generativa**.
